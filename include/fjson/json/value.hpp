@@ -40,10 +40,6 @@ public:
     explicit Value(std::string_view str);
     explicit Value(const char* str);
 
-    template <class StringTp>
-        requires (std::same_as<std::remove_cvref_t<StringTp>, std::string>)
-    explicit Value(StringTp&& str);
-
     // Number constructor
     template <std::integral Tp>
         requires (!std::same_as<Tp, bool>)
@@ -75,11 +71,6 @@ inline Value::Value(const std::string_view str)
 
 inline Value::Value(const char* str)
     : data_(str) {}
-
-template <class StringTp>
-    requires (std::same_as<std::remove_cvref_t<StringTp>, std::string>)
-Value::Value(StringTp&& str)
-    : data_(std::forward<StringTp>(str)) {}
 
 template <std::integral Tp>
     requires (!std::same_as<Tp, bool>)
