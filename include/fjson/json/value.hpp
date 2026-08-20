@@ -90,7 +90,7 @@ Value::Value(ArrayTp&& array)
     : data_(std::forward<ArrayTp>(array)) {}
 
 template <class ObjectTp>
-    requires (std::same_as<std::remove_cvref_t<ObjectTp>, std::vector<std::pair<std::string, Value>>>)
+    requires (std::same_as<std::remove_cvref_t<ObjectTp>, Value::object_type>)
 Value::Value(ObjectTp&& object)
     : data_(std::forward<ObjectTp>(object)) {}
 
