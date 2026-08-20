@@ -85,18 +85,17 @@ int main() {
         )
         .collect();
 
-    auto v = fjson::ObjectBuilder{}
-        .member("id", 42)
-        .member("tags",
-            fjson::ArrayBuilder{}
-                .item("cpp")
-                .collect()
-        )
-        .collect();
-
     std::println("{}", json);
-    // [ 42, "some_string", true, { id : 52, pi : 3.14 } ]
-    std::println("{}", v);
+    // [ 42, "some_string", true, { id : 52, pi : 3.14 }
+
+    const auto in = fjson::Value{"лол"};
+
+    try {
+        auto from = in.as<std::string>();
+        std::println("{}", from);
+    } catch (const std::runtime_error& conversion_err) {
+        std::println("{}", conversion_err.what());
+    }
 
     return 0;
 }

@@ -15,9 +15,9 @@
 #include <string> // std::string
 #include <cstdint> // std::uint64_t
 #include <vector> // std::vector
+#include <meta>
 
 namespace fjson {
-
 class Value final {
 public:
     using array_type = std::vector<Value>;
@@ -60,6 +60,13 @@ public:
     template <class ObjectTp>
         requires (std::same_as<std::remove_cvref_t<ObjectTp>, object_type>)
     explicit Value(ObjectTp&& object);
+public:
+    // Serialization
+    template <class Tp>
+    Tp as() const noexcept(false);
+
+    template <class Tp>
+    std::optional<Tp> try_as() const noexcept;
 
 public:
     template <class Self>
@@ -93,6 +100,38 @@ template <class ObjectTp>
     requires (std::same_as<std::remove_cvref_t<ObjectTp>, Value::object_type>)
 Value::Value(ObjectTp&& object)
     : data_(std::forward<ObjectTp>(object)) {}
+
+template <class Tp>
+Tp Value::as() const noexcept(false) {
+    auto res = try_as<Tp>();
+
+    return res ? *res : throw std::runtime_error(std::format("cannot convert to {}", std::meta::display_string_of(^^Tp)));
+}
+
+template <class Tp>
+std::optional<Tp> Value::try_as() const noexcept {
+    if constexpr (requires { std::get_if<Tp>(&data_); }) {
+        if (auto* result = std::get_if<Tp>(&data_)) {
+            return *result;
+        }
+    }
+
+    static constexpr auto arg_list =
+        std::define_static_array(std::meta::template_arguments_of(^^std::decay_t<data_type>));
+
+
+    template for (constexpr auto arg : arg_list) {
+        using CurrTp = [:arg:];
+
+        if constexpr (std::convertible_to<CurrTp, Tp>) {
+            if (auto ptr = std::get_if<CurrTp>(&data_)) {
+                return static_cast<Tp>(*ptr);
+            }
+        }
+    }
+
+    return std::nullopt;
+}
 
 template <class Self>
 decltype(auto) Value::get_raw_variant(this Self&& self)  {
