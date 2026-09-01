@@ -237,10 +237,6 @@ constexpr std::optional<T> Value::try_as() const noexcept {
         }
     }
 
-    if (std::get_if<std::monostate>(&data_)) {
-        return static_cast<T>(nullptr);
-    }
-
     return std::nullopt;
 }
 

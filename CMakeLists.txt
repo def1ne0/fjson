@@ -9,9 +9,12 @@ target_include_directories(fjson INTERFACE
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(fjson INTERFACE cxx_std_26)
+target_compile_options(fjson INTERFACE
+        $<$<CXX_COMPILER_ID:GNU>:-freflection>
+)
 
 include(GNUInstallDirs)
-install(DIRECTORY include/fjson DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(TARGETS fjson
         EXPORT FjsonTargets
@@ -21,6 +24,10 @@ install(EXPORT FjsonTargets
         FILE FjsonTargets.cmake
         NAMESPACE fjson::
         DESTINATION ${CMAKE_INSTALL_DATADIR}/fjson
-
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
