@@ -15,9 +15,16 @@
 #include <string> // std::string
 #include <cstdint> // std::uint64_t
 #include <vector> // std::vector
-#include <meta>
+#include <meta> // reflection
+#include <utility>
+
+#include "json_deserializable.hpp" // fjson::serializable
+#include "annotations/skip.hpp" // fjson::skipt_t
+#include "type_traits/has_annotationed_fields.hpp" // fjson::has_annotationed_fields
+#include "type_traits/has_fjson_traits.hpp" // fjson::has_fjson_traits
 
 namespace fjson {
+
 class Value final {
 public:
     using array_type = std::vector<Value>;
@@ -36,105 +43,209 @@ private:
     data_type data_{};
 
 public:
+    // Default - null constructor
+    constexpr Value() = default;
+
     // String constructor
-    explicit Value(std::string_view str);
-    explicit Value(const char* str);
+    constexpr explicit Value(std::string_view str);
+    constexpr explicit Value(const char* str);
 
     // Number constructor
-    template <std::integral Tp>
-        requires (!std::same_as<Tp, bool>)
-    explicit Value(Tp number);
+    template <std::integral T>
+        requires (!std::same_as<T, bool>)
+    constexpr explicit Value(T number);
 
-    template <std::floating_point Tp>
-    explicit Value(Tp number);
+    template <std::floating_point T>
+    constexpr explicit Value(T number);
 
     // Bool constructor
-    explicit Value(bool val);
+    constexpr explicit Value(bool val);
 
     // Array constructor
     template <class ArrayTp>
         requires (std::same_as<std::remove_cvref_t<ArrayTp>, array_type>)
-    explicit Value(ArrayTp&& array);
+    constexpr explicit Value(ArrayTp&& array);
 
     // Object constructor
     template <class ObjectTp>
         requires (std::same_as<std::remove_cvref_t<ObjectTp>, object_type>)
-    explicit Value(ObjectTp&& object);
+    constexpr explicit Value(ObjectTp&& object);
+public:
+    std::optional<Value> find_field_by_string(std::string_view target) const;
+
 public:
     // Serialization
-    template <class Tp>
-    Tp as() const noexcept(false);
 
-    template <class Tp>
-    std::optional<Tp> try_as() const noexcept;
+    template <json_deserializable T>
+    T as() const noexcept;
+
+    template <json_deserializable T>
+    constexpr std::optional<T> try_as() const noexcept;
 
 public:
     template <class Self>
-    decltype(auto) get_raw_variant(this Self&& self);
+    constexpr decltype(auto) get_raw_variant(this Self&& self);
 };
 
-inline Value::Value(const std::string_view str)
+constexpr Value::Value(const std::string_view str)
     : data_(std::string{str}) {}
 
-inline Value::Value(const char* str)
+constexpr  Value::Value(const char* str)
     : data_(str) {}
 
-template <std::integral Tp>
-    requires (!std::same_as<Tp, bool>)
-Value::Value(const Tp number)
+template <std::integral T>
+    requires (!std::same_as<T, bool>)
+constexpr Value::Value(const T number)
     : data_(number) {}
 
-template <std::floating_point Tp>
-Value::Value(Tp number)
+template <std::floating_point T>
+constexpr Value::Value(T number)
     : data_(number) {}
 
-inline Value::Value(const bool val)
+constexpr Value::Value(const bool val)
     : data_(val) {}
 
 template <class ArrayTp>
     requires (std::same_as<std::remove_cvref_t<ArrayTp>, Value::array_type>)
-Value::Value(ArrayTp&& array)
+constexpr Value::Value(ArrayTp&& array)
     : data_(std::forward<ArrayTp>(array)) {}
 
 template <class ObjectTp>
     requires (std::same_as<std::remove_cvref_t<ObjectTp>, Value::object_type>)
-Value::Value(ObjectTp&& object)
+constexpr Value::Value(ObjectTp&& object)
     : data_(std::forward<ObjectTp>(object)) {}
 
-template <class Tp>
-Tp Value::as() const noexcept(false) {
-    auto res = try_as<Tp>();
+inline std::optional<Value> Value::find_field_by_string(const std::string_view target) const {
+    if (auto* p_obj = std::get_if<object_type>(&data_)) {
+        for (const auto& [name, val] : *p_obj) {
+            if (name == target) {
+                return val;
+            }
+        }
 
-    return res ? *res : throw std::runtime_error(std::format("cannot convert to {}", std::meta::display_string_of(^^Tp)));
+        return std::nullopt;
+    }
+
+    return std::nullopt;
 }
 
-template <class Tp>
-std::optional<Tp> Value::try_as() const noexcept {
-    if constexpr (requires { std::get_if<Tp>(&data_); }) {
-        if (auto* result = std::get_if<Tp>(&data_)) {
+template <json_deserializable T>
+T Value::as() const noexcept {
+    if constexpr (requires { std::get_if<T>(&data_); }) {
+        if (auto* result = std::get_if<T>(&data_)) {
             return *result;
+        }
+    } else {
+        static constexpr auto arg_list =
+        std::define_static_array(std::meta::template_arguments_of(^^std::decay_t<data_type>));
+
+        template for (constexpr auto arg : arg_list) {
+            using CurrTp = [:arg:];
+
+            if constexpr (std::convertible_to<CurrTp, T>) {
+                if (auto ptr = std::get_if<CurrTp>(&data_)) {
+                    return static_cast<T>(*ptr);
+                }
+            }
+        }
+    }
+}
+
+template <json_deserializable T>
+constexpr std::optional<T> Value::try_as() const noexcept {
+    // Priority
+    // 1. has T::from_json()
+    // 2. has fjson::traits<T>
+    // 3. annotations
+    // 4. automatic reflection
+    if constexpr (has_from_json<T>) {
+        return T::from_json(*this);
+    }
+
+    if constexpr (has_json_traits<T>) {
+        return json_traits<T>::from_json(*this);
+    }
+
+    if constexpr (has_annotation<T, deserializable_t>) {
+        if constexpr (has_annotationed_field<T>) {
+            T obj{};
+            static constexpr auto fields =
+                std::define_static_array(
+                    std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unprivileged()
+                )
+            );
+
+            template for (constexpr auto field : fields) {
+                constexpr auto skip_anns =
+                    std::define_static_array(std::meta::annotations_of_with_type(field, ^^skip_t));
+
+                if constexpr (!skip_anns.empty()) {
+                    continue;
+                }
+
+                using FieldT = [: std::meta::type_of(field) :];
+                constexpr auto field_name = std::meta::identifier_of(field);
+
+                if (auto json_field = find_field_by_string(field_name)) {
+                    if (auto val = json_field->template try_as<FieldT>()) {
+                        obj.[: field :] = *val;
+                    }
+                }
+            }
+            return obj;
+        }
+
+        T obj{};
+        static constexpr auto fields =
+            std::define_static_array(
+                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unprivileged()
+            )
+        );
+
+        template for (constexpr auto field : fields) {
+            using FieldT = [: std::meta::type_of(field) :];
+            constexpr auto field_name = std::meta::identifier_of(field);
+
+            if (auto json_field = find_field_by_string(field_name)) {
+                if (auto val = json_field->template try_as<FieldT>()) {
+                    obj.[: field :] = *val;
+                }
+            }
+        }
+
+        return obj;
+    }
+
+    static constexpr auto types =
+        std::define_static_array(std::meta::template_arguments_of(
+            ^^std::variant<
+                std::monostate, // Null
+                std::string, // String
+                std::uint64_t, std::int64_t, double, // Number
+                bool, // Boolean
+                std::vector<Value>, // Array
+                std::vector<std::pair<std::string, Value>> // Object
+            >)
+        );
+    template for (constexpr auto type : types) {
+        using CurrT = [: type :];
+
+        if constexpr (std::convertible_to<CurrT, T>) {
+            if (auto* p_res = std::get_if<CurrT>(&data_)) {
+                return static_cast<T>(*p_res);
+            }
         }
     }
 
-    static constexpr auto arg_list =
-        std::define_static_array(std::meta::template_arguments_of(^^std::decay_t<data_type>));
-
-
-    template for (constexpr auto arg : arg_list) {
-        using CurrTp = [:arg:];
-
-        if constexpr (std::convertible_to<CurrTp, Tp>) {
-            if (auto ptr = std::get_if<CurrTp>(&data_)) {
-                return static_cast<Tp>(*ptr);
-            }
-        }
+    if (std::get_if<std::monostate>(&data_)) {
+        return static_cast<T>(nullptr);
     }
 
     return std::nullopt;
 }
 
 template <class Self>
-decltype(auto) Value::get_raw_variant(this Self&& self)  {
+constexpr decltype(auto) Value::get_raw_variant(this Self&& self)  {
     return std::forward<Self>(self).data_;
 }
 

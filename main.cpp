@@ -1,8 +1,13 @@
+#include <cassert>
 #include <format>
-#include <variant>
 #include <print>
+#include <variant>
 
-#include "include/fjson/json.hpp"
+#include "fjson/json.hpp"
+#include "fjson/json/json_deserializable.hpp"
+#include "fjson/json/annotations/serializable.hpp"
+#include "fjson/json/annotations/skip.hpp"
+#include "fjson/json/type_traits/has_annotationed_fields.hpp"
 
 template <>
 struct std::formatter<fjson::Value> {
@@ -73,8 +78,17 @@ struct std::formatter<fjson::Value> {
     }
 };
 
+namespace {
+
+struct [[= fjson::deserializable]] Person {
+    std::int64_t age = 52;
+    std::string name = "sigma";
+};
+
+} // namespace
+
 int main() {
-    fjson::Value json = fjson::ArrayBuilder{}
+    fjson::Value json1 = fjson::ArrayBuilder{}
         .item(42)
         .item("some_string")
         .item(true)
@@ -85,18 +99,18 @@ int main() {
         )
         .collect();
 
-    std::println("{}", json);
-    // [ 42, "some_string", true, { id : 52, pi : 3.14 }
+    // std::println("{}", json);
+    // [ 42, "some_string", true, { id : 52, pi : 3.14 } ]
 
-    const auto in = fjson::Value{"лол"};
+    auto json = fjson::ObjectBuilder{}
+        .member("age", 5)
+        .member("name", "Вася")
+        .collect();
 
-    try {
-        auto from = in.as<std::string>();
-        std::println("{}", from);
-    } catch (const std::runtime_error& conversion_err) {
-        std::println("{}", conversion_err.what());
-    }
-
+    auto test = fjson::Value{5};
+    auto res = test.try_as<bool>();
+    assert(res);
+    assert(*res);
     return 0;
 }
 
