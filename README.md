@@ -1,5 +1,22 @@
-**C++26 MODERN HEADER-ONLY LIBRARY FOR JSON 
-SERIALIZATION / DESERIALIZATION**
+# C++26 MODERN HEADER-ONLY LIBRARY FOR JSON 
+SERIALIZATION / DESERIALIZATION
+
+**Note:**
+only gcc supports some c++26 functionality now
+
+**How to install:**
+- cmake minimal example
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+        fjson
+        GIT_REPOSITORY https://github.com/def1ne0/fjson
+        GIT_TAG v0.1.1 # or another verison
+)
+FetchContent_MakeAvailable(fjson)
+# ...
+target_link_libraries(fjson::fjson)
+```
 
 Done:
 1. Deserialize support via default deserialization, static from_json method and fjson::json_traits<T> implementation
@@ -23,7 +40,7 @@ struct [[=fjson::deserializable]] Person {
 int main() {
     constexpr auto json = fjson::ObjectBuilder{}
         .member("age", 5)
-        .member("name", "hi")
+        .member("name3", "hi")
         .collect();
 
     auto person = json.try_as<Person>();
@@ -32,5 +49,4 @@ int main() {
     assert(person->age == 0);
     assert(person->name == "hi");
 }
-
 ```
