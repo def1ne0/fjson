@@ -3,8 +3,6 @@
 
 #include <fjson/json.hpp>
 
-
-
 template <>
 struct std::formatter<fjson::Value> {
     constexpr auto parse(std::format_parse_context& ctx) {
@@ -76,13 +74,37 @@ struct std::formatter<fjson::Value> {
 
 namespace {
 
-struct [[= fjson::deserializable]] Person {
-    [[= fjson::skip]]
+// EXAMPLE 1
+
+struct [[=fjson::deserializable]] Person {
+    [[=fjson::skip]]
     int age;
     std::string name;
 };
 
+// EXAMPLE 2
+
+class [[=fjson::deserializable]] Foo {
+    std::uint64_t secret_{};
+    std::string username_{};
+
+public:
+    Foo(std::uint64_t secret, std::string_view username) : secret_(secret), username_(username) {}
+    std::uint64_t GetSecret() const { return secret_; }
+    std::string GetName() const { return username_; }
+};
+
 } // namespace
+
+template <>
+struct fjson::json_traits<Foo> {
+    static std::optional<Foo> from_json(const fjson::Value&) {
+        return {{42, "Swagg"}};
+    };
+
+    static fjson::Value to_json(const Foo&) { return {};  }
+};
+
 
 int main() {
     auto json = fjson::ObjectBuilder{}
@@ -96,9 +118,12 @@ int main() {
     assert(person->age == 0);
     assert(person->name == "hi");
 
+    auto foo = json.try_as<Foo>();
+    assert(foo->GetName() == "Swagg");
+    assert(foo->GetSecret() == 42);
+
     auto j1 = fjson::Value{};
     auto r1 = j1.try_as<bool>();
-
     assert(!r1);
 
     return 0;

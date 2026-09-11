@@ -17,27 +17,27 @@ public:
     using object_type = Value::object_type;
 
 public:
-    template <class Self, class Tp>
-    ObjectBuilder&& member(this Self&& self, std::string_view str, Tp&& into_value);
+    template <class Self, class T>
+    constexpr ObjectBuilder&& member(this Self&& self, std::string_view str, T&& into_value);
 
     template <class Self>
-    decltype(auto) collect(this Self&& self);
+    constexpr decltype(auto) collect(this Self&& self);
 private:
     object_type object_;
 };
 
-template <class Self, class Tp>
-ObjectBuilder&& ObjectBuilder::member(this Self&& self, std::string_view str, Tp&& into_value) {
+template <class Self, class T>
+constexpr ObjectBuilder&& ObjectBuilder::member(this Self&& self, std::string_view str, T&& into_value) {
     self.object_.emplace_back(member_type{
         str,
-        std::forward<Tp>(into_value)
+        std::forward<T>(into_value)
     });
 
     return std::forward<Self>(self);
 }
 
 template <class Self>
-decltype(auto) ObjectBuilder::collect(this Self&& self)  {
+constexpr decltype(auto) ObjectBuilder::collect(this Self&& self)  {
     return Value{std::forward<Self>(self).object_};
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fjson/json/type_traits/json_traits.hpp"
+#include "fjson/json/type_traits/json_traits.hpp" // fjson::json_traits
 
 namespace fjson {
 

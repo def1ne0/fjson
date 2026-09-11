@@ -2,7 +2,8 @@
 
 #include <meta> // reflection
 #include <variant> // std::variant
-#include <cstdint> // std::uint64_t, std::int64_t
+
+#include "fjson/json/value.hpp" // fjson::Value::data_type
 
 namespace fjson {
 
@@ -13,14 +14,7 @@ concept is_json_convertible = requires {
     [] {
         static constexpr auto arg_list =
             std::define_static_array(std::meta::template_arguments_of(
-                ^^std::variant<
-                    std::monostate, // null
-                    std::string, // string
-                    std::uint64_t, std::int64_t, double, // Number
-                    bool, // Boolean
-                    std::vector<Value>, // Array
-                    std::vector<std::pair<std::string, Value>> // Object
-                >
+                std::meta::dealias(^^Value::data_type)
             )
         );    
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <meta>
+#include <meta> // reflection
 
 namespace fjson {
 
