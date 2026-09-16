@@ -1,5 +1,6 @@
 #include <cassert>
 #include <format>
+#include <print>
 
 #include <fjson/json.hpp>
 
@@ -122,9 +123,16 @@ int main() {
     assert(foo->GetName() == "Swagg");
     assert(foo->GetSecret() == 42);
 
-    auto j1 = fjson::Value{};
-    auto r1 = j1.try_as<bool>();
-    assert(!r1);
+    auto j1 = fjson::Value{"1"};
+
+    try {
+        auto r1 = j1.as<Person>();
+        std::println("success");
+    } catch (const std::runtime_error& err) {
+        std::println("{}", err.what());
+    }
+
+
 
     return 0;
 }

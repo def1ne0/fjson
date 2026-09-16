@@ -20,6 +20,7 @@
 
 #include "json_deserializable.hpp" // fjson::serializable
 #include "annotations/skip.hpp" // fjson::skipt_t
+#include "fjson/detail/deserialize/get_fields_aggregate.hpp"
 #include "type_traits/has_annotationed_fields.hpp" // fjson::has_annotationed_fields
 #include "type_traits/has_json_traits.hpp" // fjson::has_fjson_traits
 
@@ -62,22 +63,21 @@ public:
     constexpr explicit Value(bool val);
 
     // Array constructor
-    template <class ArrayTp>
-        requires (std::same_as<std::remove_cvref_t<ArrayTp>, array_type>)
-    constexpr explicit Value(ArrayTp&& array);
+    template <class ArrayT>
+        requires (std::same_as<std::remove_cvref_t<ArrayT>, array_type>)
+    constexpr explicit Value(ArrayT&& array);
 
     // Object constructor
-    template <class ObjectTp>
-        requires (std::same_as<std::remove_cvref_t<ObjectTp>, object_type>)
-    constexpr explicit Value(ObjectTp&& object);
+    template <class ObjectT>
+        requires (std::same_as<std::remove_cvref_t<ObjectT>, object_type>)
+    constexpr explicit Value(ObjectT&& object);
 public:
     [[nodiscard]] std::optional<Value> find_field_by_string(std::string_view target) const;
 
 public:
     // Serialization
-
-    template <json_deserializable T>
-    T as() const noexcept;
+    template <json_deserializable T, class Self>
+    T as(this Self&& self);
 
     template <json_deserializable T, class Self>
     constexpr std::optional<T> try_as(this Self&& self) noexcept;
@@ -85,6 +85,10 @@ public:
 public:
     template <class Self>
     constexpr decltype(auto) get_raw_variant(this Self&& self);
+
+    // Checks if std::variant holds object_type
+    // representing JSON object
+    bool is_object() const;
 };
 
 constexpr Value::Value(const std::string_view str)
@@ -105,15 +109,15 @@ constexpr Value::Value(T number)
 constexpr Value::Value(const bool val)
     : data_(val) {}
 
-template <class ArrayTp>
-    requires (std::same_as<std::remove_cvref_t<ArrayTp>, Value::array_type>)
-constexpr Value::Value(ArrayTp&& array)
-    : data_(std::forward<ArrayTp>(array)) {}
+template <class ArrayT>
+    requires (std::same_as<std::remove_cvref_t<ArrayT>, Value::array_type>)
+constexpr Value::Value(ArrayT&& array)
+    : data_(std::forward<ArrayT>(array)) {}
 
-template <class ObjectTp>
-    requires (std::same_as<std::remove_cvref_t<ObjectTp>, Value::object_type>)
-constexpr Value::Value(ObjectTp&& object)
-    : data_(std::forward<ObjectTp>(object)) {}
+template <class ObjectT>
+    requires (std::same_as<std::remove_cvref_t<ObjectT>, Value::object_type>)
+constexpr Value::Value(ObjectT&& object)
+    : data_(std::forward<ObjectT>(object)) {}
 
 inline std::optional<Value> Value::find_field_by_string(const std::string_view target) const {
     if (auto* p_obj = std::get_if<object_type>(&data_)) {
@@ -129,8 +133,26 @@ inline std::optional<Value> Value::find_field_by_string(const std::string_view t
     return std::nullopt;
 }
 
-template <json_deserializable T>
-T Value::as() const noexcept { std::unreachable(); } // TODO
+template <json_deserializable T, class Self>
+T Value::as(this Self&& self) {
+    const auto res = self.template try_as<T, Self>();
+
+    if (!res) {
+        constexpr auto types = std::define_static_array(std::meta::template_arguments_of(std::meta::dealias(^^data_type)));
+
+        std::string variant_curr_type = "UNDEFINED_TYPE";
+
+        template for (constexpr auto i : std::views::iota(0uz, types.size())) {
+            if (self.data_.index() == i) {
+                variant_curr_type = std::meta::display_string_of(types[i]);
+            }
+        }
+
+        throw std::runtime_error(std::format("Cannot deserialize {} to {}", variant_curr_type, std::meta::display_string_of(^^T)));
+    }
+
+    return *res;
+}
 
 template <json_deserializable T, class Self>
 constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
@@ -147,28 +169,23 @@ constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
     } else if constexpr (has_json_traits<T>) {
         return json_traits<T>::from_json(std::forward<Self>(self));
     } else if constexpr (has_annotation<T, deserializable_t>) {
+        if (!self.is_object()) {
+            return result;
+        }
+
         if constexpr (has_annotationed_field<T>) {
             static constexpr auto fields =
-            std::define_static_array(
-                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unprivileged()
+                std::define_static_array(
+                    std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unprivileged()
                 )
             );
 
             struct FieldsStorage;
 
             consteval {
-                auto storage_specifiers = std::vector<std::meta::info>{};
+                auto specifiers = __detail::deserialize::extract_storage_specifiers(fields);
 
-                template for (constexpr auto field : fields) {
-                    storage_specifiers.push_back(
-                        std::meta::data_member_spec(
-                            std::meta::type_of(field),
-                            {.name = std::meta::identifier_of(field)}
-                        )
-                    );
-                }
-
-                std::meta::define_aggregate(^^FieldsStorage, storage_specifiers);
+                std::meta::define_aggregate(^^FieldsStorage, specifiers);
             }
 
             FieldsStorage storage;
@@ -212,18 +229,9 @@ constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
             struct FieldsStorage;
 
             consteval {
-                auto storage_specifiers = std::vector<std::meta::info>{};
+                auto specifiers = __detail::deserialize::extract_storage_specifiers(fields);
 
-                template for (constexpr auto field : fields) {
-                    storage_specifiers.push_back(
-                        std::meta::data_member_spec(
-                            std::meta::type_of(field),
-                            {.name = std::meta::identifier_of(field)}
-                        )
-                    );
-                }
-
-                std::meta::define_aggregate(^^FieldsStorage, storage_specifiers);
+                std::meta::define_aggregate(^^FieldsStorage, specifiers);
             }
 
             FieldsStorage storage;
@@ -281,6 +289,10 @@ constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
 template <class Self>
 constexpr decltype(auto) Value::get_raw_variant(this Self&& self)  {
     return std::forward<Self>(self).data_;
+}
+
+inline bool Value::is_object() const {
+    return data_.index() == 7;
 }
 
 } // namespace fjson
