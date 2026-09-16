@@ -55,11 +55,14 @@ int main() {
 #include <fjson/json.hpp>
 
 namespace {
+
 struct [[=fjson::deserializable]] Person {
     int age;
     std::string name;
 }
+
 } // namespace
+
 int main() {
     constexpr auto j1 = fjson::Value{"1"};
 
