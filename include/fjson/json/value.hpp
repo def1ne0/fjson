@@ -26,6 +26,9 @@
 
 namespace fjson {
 
+/**
+ * @brief C++ type representation of JSON-object
+ */
 class Value final {
 public:
     using array_type = std::vector<Value>;
@@ -44,34 +47,74 @@ private:
     data_type data_{};
 
 public:
-    // Default - null constructor
+    /**
+     * @brief JSON's null constructor
+     */
     constexpr Value() = default;
 
-    // String constructor
+    /**
+     * @brief JSON's string constructor
+     * @param str std::string_view
+     */
     constexpr explicit Value(std::string_view str);
+
+    /**
+     * @brief JSON's string constructor
+     * @param str C-string, should be null-terminated
+     */
     constexpr explicit Value(const char* str);
 
-    // Number constructor
+    /**
+     * @brief JSON's number constructor
+     * @details Accepts integral number
+     * @param number Integral number
+     */
     template <std::integral T>
         requires (!std::same_as<T, bool>)
     constexpr explicit Value(T number);
 
+    /**
+     * @brief JSON's number constructor
+     * @details Accepts floating point number
+     * @param number Floating point number
+     */
     template <std::floating_point T>
     constexpr explicit Value(T number);
 
-    // Bool constructor
+    /**
+     * @brief JSON's number constructor
+     * @param val Boolean value
+     */
     constexpr explicit Value(bool val);
 
-    // Array constructor
+    /**
+     * @brief JSON's number constructor
+     * @details Accepts type, that's `Value::array_type` or
+     * implicitly convertible to it
+     * @param array Value::array_type
+     */
     template <class ArrayT>
         requires (std::same_as<std::remove_cvref_t<ArrayT>, array_type>)
     constexpr explicit Value(ArrayT&& array);
 
-    // Object constructor
+    /**
+     * @brief JSON's number constructor
+     * @details Accepts type, that's `Value::object_type` or
+     * implicitly convertible to it
+     * @param object Value::object_type
+     */
     template <class ObjectT>
         requires (std::same_as<std::remove_cvref_t<ObjectT>, object_type>)
     constexpr explicit Value(ObjectT&& object);
 public:
+    /**
+     * @brief Finds non-recursively field named `str` in JSON's object
+     * @details If `Value::data_type` currently stores an `object_type`,
+     * then it goes through every `std::pair<std::string, std::string> row`
+     * and returns `row.second` of the first `row`, that has `row.first == target`
+     * @param target string to find
+     * @return std::optional<Value>
+     */
     [[nodiscard]] std::optional<Value> find_field_by_string(std::string_view target) const;
 
 public:
@@ -88,7 +131,7 @@ public:
 
     // Checks if std::variant holds object_type
     // representing JSON object
-    bool is_object() const;
+    [[nodiscard]] bool is_object() const;
 };
 
 constexpr Value::Value(const std::string_view str)

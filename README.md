@@ -40,7 +40,7 @@ struct [[=fjson::deserializable]] Person {
 int main() {
     constexpr auto json = fjson::ObjectBuilder{}
         .member("age", 5)
-        .member("name3", "hi")
+        .member("name", "hi")
         .collect();
 
     auto person = json.try_as<Person>();
@@ -54,10 +54,14 @@ int main() {
 #include <string>
 #include <fjson/json.hpp>
 
+namespace {
+
 struct [[=fjson::deserializable]] Person {
     int age;
     std::string name;
 }
+
+} // namespace
 
 int main() {
     constexpr auto j1 = fjson::Value{"1"};
