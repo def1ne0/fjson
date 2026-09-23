@@ -1,7 +1,7 @@
 #pragma once
 #include <meta>
 
-namespace fjson::__detail::deserialize {
+namespace fjson::_detail_::deserialize {
 
 consteval auto extract_storage_specifiers(
     const std::span<const std::meta::info> fields)
@@ -20,4 +20,4 @@ consteval auto extract_storage_specifiers(
     return storage_specifiers;
 }
 
-} // namespace fjson::__detail::deserialize
+} // namespace fjson::_detail_::deserialize

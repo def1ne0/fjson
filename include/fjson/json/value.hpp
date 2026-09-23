@@ -20,7 +20,7 @@
 
 #include "json_deserializable.hpp" // fjson::serializable
 #include "annotations/skip.hpp" // fjson::skipt_t
-#include "fjson/detail/deserialize/get_fields_aggregate.hpp"
+#include "fjson/detail/deserialize/get_fields_aggregate.hpp" // fjson::_detail_::get_fields_aggregate
 #include "type_traits/has_annotationed_fields.hpp" // fjson::has_annotationed_fields
 #include "type_traits/has_json_traits.hpp" // fjson::has_fjson_traits
 
@@ -226,7 +226,7 @@ constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
             struct FieldsStorage;
 
             consteval {
-                auto specifiers = __detail::deserialize::extract_storage_specifiers(fields);
+                auto specifiers = _detail_::deserialize::extract_storage_specifiers(fields);
 
                 std::meta::define_aggregate(^^FieldsStorage, specifiers);
             }
@@ -272,7 +272,7 @@ constexpr std::optional<T> Value::try_as(this Self&& self) noexcept {
             struct FieldsStorage;
 
             consteval {
-                auto specifiers = __detail::deserialize::extract_storage_specifiers(fields);
+                auto specifiers = _detail_::deserialize::extract_storage_specifiers(fields);
 
                 std::meta::define_aggregate(^^FieldsStorage, specifiers);
             }
