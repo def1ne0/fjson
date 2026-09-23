@@ -20,7 +20,7 @@
 
 #include "json_deserializable.hpp" // fjson::serializable
 #include "annotations/skip.hpp" // fjson::skipt_t
-#include "fjson/detail/deserialize/get_fields_aggregate.hpp" // fjson::_detail_::get_fields_aggregate
+#include "detail/deserialize/get_fields_aggregate.hpp" // fjson::_detail_::get_fields_aggregate
 #include "type_traits/has_annotationed_fields.hpp" // fjson::has_annotationed_fields
 #include "type_traits/has_json_traits.hpp" // fjson::has_fjson_traits
 
